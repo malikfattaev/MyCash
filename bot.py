@@ -211,21 +211,22 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # Setting a new balance.
         if user["state"] == "awaiting_new_balance":
             amount = parse_amount(text)
-            if amount is None:
+            if amount is not None:
+                await conn.execute(
+                    "UPDATE users SET balance = $1, state = NULL WHERE user_id = $2",
+                    amount,
+                    user_id,
+                )
                 await update.message.reply_text(
-                    "Не понял число. Напиши баланс, например: 500000"
+                    f"Баланс обновлён: {fmt_amount(amount)} сум",
+                    reply_markup=MAIN_KEYBOARD,
                 )
                 return
+            # Not a plain number: user gave up on changing the balance.
+            # Drop the state and handle the message as usual (e.g. an operation).
             await conn.execute(
-                "UPDATE users SET balance = $1, state = NULL WHERE user_id = $2",
-                amount,
-                user_id,
+                "UPDATE users SET state = NULL WHERE user_id = $1", user_id
             )
-            await update.message.reply_text(
-                f"Баланс обновлён: {fmt_amount(amount)} сум",
-                reply_markup=MAIN_KEYBOARD,
-            )
-            return
 
         # Otherwise try to read it as an operation.
         parsed = parse_transaction(text)
